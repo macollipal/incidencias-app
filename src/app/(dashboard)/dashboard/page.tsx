@@ -145,7 +145,7 @@ export default function DashboardPage() {
     setSelectedVisitaId(null);
   };
 
-  const handleUpdateVisitaEstado = async (estado: string) => {
+  const handleUpdateVisitaEstado = async (estado: "PROGRAMADA" | "EN_PROGRESO" | "COMPLETADA" | "CANCELADA") => {
     if (!selectedVisitaId) return;
     try {
       await updateVisitaMutation.mutateAsync({

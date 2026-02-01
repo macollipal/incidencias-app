@@ -46,6 +46,7 @@ enum TipoResolucion {
 
 enum EstadoVisita {
   PROGRAMADA
+  EN_PROGRESO
   COMPLETADA
   CANCELADA
 }

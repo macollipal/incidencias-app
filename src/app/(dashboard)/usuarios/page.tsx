@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { UserPlus, Search, Loader2, Pencil, Trash2 } from "lucide-react";
-import { useUsuarios, useCreateUsuario, useUpdateUsuario, useDeleteUsuario } from "@/hooks/use-usuarios";
+import { useUsuarios, useCreateUsuario, useUpdateUsuario, useDeleteUsuario, type Usuario } from "@/hooks/use-usuarios";
 import { useEdificios } from "@/hooks/use-edificios";
 import { toast } from "sonner";
 import { ROL_LABELS, type Rol } from "@/types";
@@ -132,7 +132,7 @@ export default function UsuariosPage() {
     setDialogOpen(true);
   };
 
-  const openEditDialog = (usuario: typeof usuarios[0]) => {
+  const openEditDialog = (usuario: Usuario) => {
     setFormMode("edit");
     setEditingId(usuario.id);
     setFormData({

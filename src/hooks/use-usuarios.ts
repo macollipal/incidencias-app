@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CreateUsuarioInput, UpdateUsuarioInput } from "@/lib/validations";
 
-interface Usuario {
+export interface Usuario {
   id: string;
   email: string;
   nombre: string;

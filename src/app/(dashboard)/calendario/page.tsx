@@ -110,8 +110,8 @@ export default function CalendarioPage() {
   };
 
   const handleCreate = async () => {
-    if (!formData.empresaId || !selectedEdificioId) {
-      toast.error("Seleccione una empresa");
+    if (!formData.empresaId || !selectedEdificioId || !formData.fechaProgramada) {
+      toast.error("Seleccione una empresa y fecha");
       return;
     }
 

@@ -22,7 +22,7 @@ export const estadoIncidenciaEnum = z.enum([
   "CERRADA",
 ]);
 
-export const estadoVisitaEnum = z.enum(["PROGRAMADA", "COMPLETADA", "CANCELADA"]);
+export const estadoVisitaEnum = z.enum(["PROGRAMADA", "EN_PROGRESO", "COMPLETADA", "CANCELADA"]);
 
 export const rolEnum = z.enum(["ADMIN_PLATAFORMA", "ADMIN_EDIFICIO", "CONSERJE", "RESIDENTE"]);
 
