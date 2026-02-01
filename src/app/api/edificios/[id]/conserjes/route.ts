@@ -7,6 +7,8 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 
+export const dynamic = "force-dynamic";
+
 type RouteParams = { params: Promise<{ id: string }> };
 
 // GET /api/edificios/[id]/conserjes - Obtener conserjes del edificio
