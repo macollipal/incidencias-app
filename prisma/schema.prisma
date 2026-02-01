@@ -1,0 +1,320 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Rol {
+  ADMIN_PLATAFORMA
+  ADMIN_EDIFICIO
+  CONSERJE
+  RESIDENTE
+}
+
+enum TipoServicio {
+  ELECTRICIDAD
+  AGUA_GAS
+  LIMPIEZA
+  SEGURIDAD
+  INFRAESTRUCTURA
+  AREAS_COMUNES
+}
+
+enum Prioridad {
+  NORMAL
+  URGENTE
+}
+
+enum EstadoIncidencia {
+  PENDIENTE          // Recién creada, sin asignar
+  ASIGNADA           // Asignada a conserje para verificación
+  ESCALADA           // Conserje escaló a administrador
+  PROGRAMADA         // Admin programó visita de empresa
+  EN_PROGRESO        // Empresa trabajando
+  RESUELTA           // Solucionada (por conserje o empresa)
+  CERRADA            // Cerrada definitivamente
+}
+
+enum TipoResolucion {
+  CONSERJE           // Resuelta por personal interno
+  EMPRESA_EXTERNA    // Resuelta por empresa de servicio
+}
+
+enum EstadoVisita {
+  PROGRAMADA
+  COMPLETADA
+  CANCELADA
+}
+
+enum TipoZona {
+  PASILLO
+  AREA_COMUN
+  ESTACIONAMIENTO
+  BODEGA
+  ASCENSOR
+  ENTRADA
+  JARDIN
+  PISCINA
+  GIMNASIO
+  OTRO
+}
+
+enum CategoriaProducto {
+  ILUMINACION
+  ELECTRICIDAD
+  PLOMERIA
+  LIMPIEZA
+  SEGURIDAD
+  FERRETERIA
+  OTRO
+}
+
+enum TipoMovimiento {
+  ENTRADA    // Reposición de stock
+  SALIDA     // Uso en incidencia
+  AJUSTE     // Ajuste manual de inventario
+}
+
+// Modelos
+model Usuario {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  nombre        String
+  rol           Rol       @default(RESIDENTE)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  edificios            UsuarioEdificio[]
+  incidencias          Incidencia[]
+  incidenciasAsignadas Incidencia[]  @relation("IncidenciasAsignadas")
+  notificaciones       Notificacion[]
+  comentarios          ComentarioIncidencia[]
+
+  @@index([rol])
+  @@map("usuarios")
+}
+
+model Edificio {
+  id        String   @id @default(cuid())
+  nombre    String
+  direccion String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  usuarios    UsuarioEdificio[]
+  incidencias Incidencia[]
+  visitas     Visita[]
+  zonas       ZonaEdificio[]
+  productos   Producto[]
+
+  @@map("edificios")
+}
+
+model UsuarioEdificio {
+  id         String   @id @default(cuid())
+  usuarioId  String   @map("usuario_id")
+  edificioId String   @map("edificio_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  edificio Edificio @relation(fields: [edificioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, edificioId])
+  @@index([edificioId])
+  @@index([usuarioId])
+  @@map("usuarios_edificios")
+}
+
+model Empresa {
+  id        String   @id @default(cuid())
+  nombre    String
+  telefono  String?
+  email     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tiposServicio EmpresaTipoServicio[]
+  visitas       Visita[]
+
+  @@map("empresas")
+}
+
+model EmpresaTipoServicio {
+  id           String       @id @default(cuid())
+  empresaId    String       @map("empresa_id")
+  tipoServicio TipoServicio @map("tipo_servicio")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, tipoServicio])
+  @@map("empresas_tipos_servicio")
+}
+
+model Incidencia {
+  id           String           @id @default(cuid())
+  edificioId   String           @map("edificio_id")
+  usuarioId    String           @map("usuario_id")
+  tipoServicio TipoServicio     @map("tipo_servicio")
+  descripcion  String
+  prioridad    Prioridad        @default(NORMAL)
+  estado       EstadoIncidencia @default(PENDIENTE)
+  visitaId     String?          @map("visita_id")
+  zonaId       String?          @map("zona_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  closedAt     DateTime?        @map("closed_at")
+
+  // Campos para flujo de conserje
+  asignadoAId       String?         @map("asignado_a_id")
+  asignadoEl        DateTime?       @map("asignado_el")
+  verificadoEl      DateTime?       @map("verificado_el")
+  descripcionVerificada String?     @map("descripcion_verificada")
+  escaladaEl        DateTime?       @map("escalada_el")
+  tipoResolucion    TipoResolucion? @map("tipo_resolucion")
+  comentarioCierre  String?         @map("comentario_cierre")
+
+  edificio       Edificio       @relation(fields: [edificioId], references: [id], onDelete: Cascade)
+  usuario        Usuario        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  asignadoA      Usuario?       @relation("IncidenciasAsignadas", fields: [asignadoAId], references: [id], onDelete: SetNull)
+  visita         Visita?        @relation(fields: [visitaId], references: [id], onDelete: SetNull)
+  zona           ZonaEdificio?  @relation(fields: [zonaId], references: [id], onDelete: SetNull)
+  notificaciones Notificacion[]
+  comentarios    ComentarioIncidencia[]
+  movimientosStock MovimientoStock[]
+
+  // Performance indexes
+  @@index([edificioId, estado])
+  @@index([edificioId, prioridad, estado])
+  @@index([asignadoAId, estado])
+  @@index([edificioId, closedAt])
+  @@index([usuarioId])
+  @@index([tipoServicio])
+  @@map("incidencias")
+}
+
+model Visita {
+  id               String      @id @default(cuid())
+  edificioId       String      @map("edificio_id")
+  empresaId        String      @map("empresa_id")
+  fechaProgramada  DateTime    @map("fecha_programada")
+  notas            String?
+  estado           EstadoVisita @default(PROGRAMADA)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  edificio    Edificio     @relation(fields: [edificioId], references: [id], onDelete: Cascade)
+  empresa     Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  incidencias Incidencia[]
+
+  @@index([edificioId, estado, fechaProgramada])
+  @@map("visitas")
+}
+
+model Notificacion {
+  id           String   @id @default(cuid())
+  usuarioId    String   @map("usuario_id")
+  incidenciaId String   @map("incidencia_id")
+  tipo         String   // 'URGENCIA' | 'RECORDATORIO'
+  leida        Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  usuario    Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  incidencia Incidencia @relation(fields: [incidenciaId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, leida, createdAt])
+  @@map("notificaciones")
+}
+
+model ComentarioIncidencia {
+  id           String   @id @default(cuid())
+  incidenciaId String   @map("incidencia_id")
+  usuarioId    String   @map("usuario_id")
+  contenido    String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  incidencia Incidencia @relation(fields: [incidenciaId], references: [id], onDelete: Cascade)
+  usuario    Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([incidenciaId])
+  @@map("comentarios_incidencias")
+}
+
+// Modelos de Inventario
+
+model ZonaEdificio {
+  id          String    @id @default(cuid())
+  edificioId  String    @map("edificio_id")
+  nombre      String
+  tipo        TipoZona
+  descripcion String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  edificio    Edificio       @relation(fields: [edificioId], references: [id], onDelete: Cascade)
+  incidencias Incidencia[]
+  productos   ProductoZona[]
+
+  @@unique([edificioId, nombre])
+  @@index([edificioId])
+  @@map("zonas_edificio")
+}
+
+model Producto {
+  id                  String            @id @default(cuid())
+  edificioId          String            @map("edificio_id")
+  nombre              String
+  categoria           CategoriaProducto
+  especificaciones    String?           // Medidas, voltaje, modelo, compatibilidad
+  stockActual         Int               @default(0) @map("stock_actual")
+  stockMinimo         Int               @default(0) @map("stock_minimo")
+  proveedorNombre     String?           @map("proveedor_nombre")
+  proveedorTelefono   String?           @map("proveedor_telefono")
+  proveedorUrl        String?           @map("proveedor_url")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  edificio    Edificio          @relation(fields: [edificioId], references: [id], onDelete: Cascade)
+  zonas       ProductoZona[]
+  movimientos MovimientoStock[]
+
+  @@unique([edificioId, nombre])
+  @@index([edificioId, categoria])
+  @@map("productos")
+}
+
+model ProductoZona {
+  id         String   @id @default(cuid())
+  productoId String   @map("producto_id")
+  zonaId     String   @map("zona_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  producto Producto     @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  zona     ZonaEdificio @relation(fields: [zonaId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, zonaId])
+  @@map("productos_zonas")
+}
+
+model MovimientoStock {
+  id           String         @id @default(cuid())
+  productoId   String         @map("producto_id")
+  incidenciaId String?        @map("incidencia_id")
+  tipo         TipoMovimiento
+  cantidad     Int
+  stockAnterior Int           @map("stock_anterior")
+  stockNuevo   Int            @map("stock_nuevo")
+  notas        String?
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  producto   Producto    @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  incidencia Incidencia? @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+
+  @@index([productoId])
+  @@index([incidenciaId])
+  @@map("movimientos_stock")
+}
