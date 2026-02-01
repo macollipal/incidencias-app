@@ -438,6 +438,54 @@ if (!isHydrated) return <Loading />;
 
 ---
 
+## Despliegue en Producción
+
+### Arquitectura de Producción
+
+```
+┌─────────────────┐      ┌─────────────────┐
+│     Vercel      │      │      Neon       │
+│  (App completa) │ ───▶ │  (PostgreSQL)   │
+│  Next.js + API  │      │   Base datos    │
+└─────────────────┘      └─────────────────┘
+```
+
+### URLs de Producción
+
+- **App**: https://incidencias-app.vercel.app (o tu dominio personalizado)
+- **Repositorio**: https://github.com/macollipal/incidencias-app
+- **Base de datos**: Neon PostgreSQL (us-east-1)
+
+### Variables de Entorno en Vercel
+
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | Connection string de Neon PostgreSQL |
+| `AUTH_SECRET` | Secret para NextAuth.js (generar con `openssl rand -base64 32`) |
+
+### Despliegue Automático
+
+- Push a `main` → Vercel hace deploy automático
+- El build ejecuta `prisma generate && next build`
+
+### Configuración de Neon
+
+1. Crear proyecto en https://neon.tech
+2. Copiar connection string (formato Prisma)
+3. Ejecutar migraciones:
+   ```bash
+   DATABASE_URL="postgresql://..." npx prisma db push
+   DATABASE_URL="postgresql://..." npm run db:seed
+   ```
+
+### Notas de Despliegue
+
+- Las API routes usan `export const dynamic = "force-dynamic"` para evitar pre-rendering
+- Prisma Client se genera durante el build (`prisma generate`)
+- ESLint configurado con extensiones `.js` para compatibilidad con Vercel
+
+---
+
 ## Notas Técnicas
 
 ### Hydration en Next.js
