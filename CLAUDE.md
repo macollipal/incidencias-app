@@ -425,6 +425,8 @@ if (!isHydrated) return <Loading />;
 - [x] Dashboard con estadísticas (refresh 30s)
 - [x] CRUD de incidencias con timeline
 - [x] Flujo de conserje (asignar/resolver/escalar)
+- [x] **UI de acciones del conserje** (resolver/escalar desde modal)
+- [x] **Asignación de conserje por admin** (selector con carga de trabajo)
 - [x] Sistema de comentarios
 - [x] Calendario de visitas
 - [x] Catálogo de empresas
@@ -435,6 +437,57 @@ if (!isHydrated) return <Loading />;
 - [ ] Notificaciones por email (Fase 2)
 - [ ] Gestión de turnos de conserjes (Fase 2)
 - [ ] Asignación automática por turno (Fase 2)
+
+---
+
+## UI/UX de Incidencias
+
+### Tabla de Incidencias
+
+Columnas ordenadas para escaneo rápido:
+1. **Fecha** - Día/mes + hora (formato compacto)
+2. **Descripción** - Texto truncado
+3. **Tipo** - Badge con categoría
+4. **Prioridad** - Normal/Urgente con icono
+5. **Estado** - Badge con icono y color
+6. **Reportado por** - Nombre del usuario
+7. **Acciones** - Botones según rol y estado
+
+### Estados Visuales
+
+| Estado | Color | Icono |
+|--------|-------|-------|
+| Pendiente | Gris | Clock |
+| Asignada | Azul | UserCheck |
+| Escalada | Naranja | AlertTriangle |
+| Programada | Morado | Calendar |
+| En Progreso | Amarillo | Wrench |
+| Resuelta | Verde | CheckCircle2 |
+| Cerrada | Gris | XCircle |
+
+### Modal de Detalle
+
+Estructura con áreas fijas y scrollables:
+- **Header fijo**: Título + estado
+- **Contenido scrollable**: Info + Timeline + Comentarios
+- **Footer fijo**: Input de comentario + botón cerrar
+
+### Acciones por Rol
+
+| Rol | Estado | Acciones |
+|-----|--------|----------|
+| Admin | PENDIENTE | Asignar, Marcar urgente, Cerrar |
+| Admin | ESCALADA | Asignar, Programar visita, Cerrar |
+| Conserje | ASIGNADA (a él) | Resolver, Escalar |
+| Residente | Cualquiera | Ver (solo lectura) |
+
+### Panel de Acciones del Conserje
+
+Cuando una incidencia está ASIGNADA al conserje logueado, se muestra:
+- Campo de verificación/análisis técnico
+- Campo de solución aplicada
+- Opción de marcar como urgente (al escalar)
+- Botones: "Resolver Incidencia" / "Escalar a Administrador"
 
 ---
 
