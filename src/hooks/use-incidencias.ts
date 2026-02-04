@@ -16,7 +16,7 @@ interface Comentario {
   usuario: Usuario;
 }
 
-interface Incidencia {
+export interface Incidencia {
   id: string;
   edificioId: string;
   usuarioId: string;

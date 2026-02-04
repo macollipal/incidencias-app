@@ -29,9 +29,10 @@ import {
     type TipoServicio,
     type EstadoIncidencia
 } from "@/types";
+import { type Incidencia } from "@/hooks/use-incidencias";
 
 interface IncidenciaTableProps {
-    incidencias: any[];
+    incidencias: Incidencia[];
     isLoading: boolean;
     isAdmin: boolean;
     onOpenDetail: (id: string) => void;
