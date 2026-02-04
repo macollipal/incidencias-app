@@ -40,6 +40,14 @@ export default function CalendarioPage() {
   const [month, setMonth] = useState<Date | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedVisita, setSelectedVisita] = useState<string | null>(null);
+  const [filterEstado, setFilterEstado] = useState<string>("TODOS");
+  const [filterEmpresa, setFilterEmpresa] = useState<string>("TODAS");
+  const [filterServicio, setFilterServicio] = useState<string>("TODOS");
+
+  // Resolution states
+  const [resolutionOpen, setResolutionOpen] = useState(false);
+  const [visitaACompletar, setVisitaACompletar] = useState<string | null>(null);
+  const [notasResolucion, setNotasResolucion] = useState("");
 
   // Form state
   const [formData, setFormData] = useState({
@@ -64,17 +72,33 @@ export default function CalendarioPage() {
   const createMutation = useCreateVisita();
   const updateMutation = useUpdateVisita();
 
-  // Fechas con visitas para marcar en el calendario
-  const fechasConVisitas = useMemo(() => {
-    if (!visitas) return [];
-    return visitas.map((v) => new Date(v.fechaProgramada));
+  // Fechas agrupadas por estado para marcar en el calendario
+  const visitasPorEstado = useMemo(() => {
+    if (!visitas) return { programadas: [], completadas: [], canceladas: [] };
+
+    return {
+      programadas: visitas.filter(v => v.estado === "PROGRAMADA").map(v => new Date(v.fechaProgramada)),
+      completadas: visitas.filter(v => v.estado === "COMPLETADA").map(v => new Date(v.fechaProgramada)),
+      canceladas: visitas.filter(v => v.estado === "CANCELADA").map(v => new Date(v.fechaProgramada)),
+    };
   }, [visitas]);
 
-  // Visitas del día seleccionado
+  // Aplicar filtros a las visitas del mes para mostrar en la lista
+  const visitasFiltradas = useMemo(() => {
+    if (!visitas) return [];
+    return visitas.filter((v) => {
+      const matchEstado = filterEstado === "TODOS" || v.estado === filterEstado;
+      const matchEmpresa = filterEmpresa === "TODAS" || v.empresaId === filterEmpresa;
+      const matchServicio = filterServicio === "TODOS" || v.incidencias.some(i => i.tipoServicio === filterServicio);
+      return matchEstado && matchEmpresa && matchServicio;
+    });
+  }, [visitas, filterEstado, filterEmpresa, filterServicio]);
+
+  // Visitas del día seleccionado (usando las ya filtradas)
   const visitasDelDia = useMemo(() => {
-    if (!visitas || !date) return [];
-    return visitas.filter((v) => isSameDay(new Date(v.fechaProgramada), date));
-  }, [visitas, date]);
+    if (!visitasFiltradas || !date) return [];
+    return visitasFiltradas.filter((v) => isSameDay(new Date(v.fechaProgramada), date));
+  }, [visitasFiltradas, date]);
 
   // Empresa seleccionada para filtrar incidencias
   const empresaSeleccionada = empresas?.find((e) => e.id === formData.empresaId);
@@ -136,16 +160,29 @@ export default function CalendarioPage() {
     }
   };
 
-  const handleComplete = async (id: string) => {
+  const handleComplete = async () => {
+    if (!visitaACompletar) return;
+
     try {
       await updateMutation.mutateAsync({
-        id,
-        data: { estado: "COMPLETADA" },
+        id: visitaACompletar,
+        data: {
+          estado: "COMPLETADA",
+          notas: notasResolucion ? `RESOLUCIÓN: ${notasResolucion}` : undefined
+        },
       });
       toast.success("Visita marcada como completada");
+      setResolutionOpen(false);
+      setVisitaACompletar(null);
+      setNotasResolucion("");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al actualizar");
     }
+  };
+
+  const openResolutionDialog = (id: string) => {
+    setVisitaACompletar(id);
+    setResolutionOpen(true);
   };
 
   const handleCancel = async (id: string) => {
@@ -185,142 +222,178 @@ export default function CalendarioPage() {
           <h1 className="text-2xl font-bold text-gray-900">Calendario</h1>
           <p className="text-gray-500">Programa y gestiona visitas técnicas</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openNewVisitaDialog}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Visita
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Programar Visita Técnica</DialogTitle>
-              <DialogDescription>
-                Selecciona una empresa y asigna incidencias a resolver
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Fecha</Label>
-                  <Calendar
-                    mode="single"
-                    selected={formData.fechaProgramada}
-                    onSelect={(d) => d && setFormData({ ...formData, fechaProgramada: d })}
-                    className="rounded-md border"
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                  />
-                </div>
-                <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Select value={filterEstado} onValueChange={setFilterEstado}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODOS">Todos los estados</SelectItem>
+              <SelectItem value="PROGRAMADA">Programadas</SelectItem>
+              <SelectItem value="COMPLETADA">Completadas</SelectItem>
+              <SelectItem value="CANCELADA">Canceladas</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Empresa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODAS">Todas las empresas</SelectItem>
+              {empresas?.map(e => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterServicio} onValueChange={setFilterServicio}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Servicio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODOS">Todos los servicios</SelectItem>
+              {Object.entries(TIPO_SERVICIO_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openNewVisitaDialog}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva Visita
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Programar Visita Técnica</DialogTitle>
+                <DialogDescription>
+                  Selecciona una empresa y asigna incidencias a resolver
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Hora</Label>
-                    <Select
-                      value={formData.hora}
-                      onValueChange={(v) => setFormData({ ...formData, hora: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 8).map((hour) => (
-                          <SelectItem key={hour} value={`${hour.toString().padStart(2, "0")}:00`}>
-                            {hour.toString().padStart(2, "0")}:00
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Empresa</Label>
-                    <Select
-                      value={formData.empresaId}
-                      onValueChange={(v) => setFormData({ ...formData, empresaId: v, incidenciaIds: [] })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar empresa" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {empresas?.map((empresa) => (
-                          <SelectItem key={empresa.id} value={empresa.id}>
-                            {empresa.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {empresaSeleccionada && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {empresaSeleccionada.tiposServicio.map((tipo) => (
-                          <Badge key={tipo} variant="outline" className="text-xs">
-                            {TIPO_SERVICIO_LABELS[tipo as TipoServicio]}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Notas (opcional)</Label>
-                    <Textarea
-                      placeholder="Instrucciones adicionales..."
-                      value={formData.notas}
-                      onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                      rows={3}
+                    <Label>Fecha</Label>
+                    <Calendar
+                      mode="single"
+                      selected={formData.fechaProgramada}
+                      onSelect={(d) => d && setFormData({ ...formData, fechaProgramada: d })}
+                      className="rounded-md border"
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     />
                   </div>
-                </div>
-              </div>
-
-              {formData.empresaId && (
-                <div className="space-y-2">
-                  <Label>Incidencias a resolver ({formData.incidenciaIds.length} seleccionadas)</Label>
-                  <div className="border rounded-lg max-h-48 overflow-y-auto">
-                    {incidenciasCompatibles.length > 0 ? (
-                      <div className="divide-y">
-                        {incidenciasCompatibles.map((inc) => (
-                          <div
-                            key={inc.id}
-                            className="flex items-center gap-3 p-3 hover:bg-gray-50"
-                          >
-                            <Checkbox
-                              id={inc.id}
-                              checked={formData.incidenciaIds.includes(inc.id)}
-                              onCheckedChange={() => handleIncidenciaToggle(inc.id)}
-                            />
-                            <label htmlFor={inc.id} className="flex-1 cursor-pointer">
-                              <p className="text-sm font-medium">{inc.descripcion}</p>
-                              <div className="flex gap-2 mt-1">
-                                <Badge variant="outline" className="text-xs">
-                                  {TIPO_SERVICIO_LABELS[inc.tipoServicio as TipoServicio]}
-                                </Badge>
-                                {inc.prioridad === "URGENTE" && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Urgente
-                                  </Badge>
-                                )}
-                              </div>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500 p-4 text-center">
-                        No hay incidencias pendientes compatibles con esta empresa
-                      </p>
-                    )}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Hora</Label>
+                      <Select
+                        value={formData.hora}
+                        onValueChange={(v) => setFormData({ ...formData, hora: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 8).map((hour) => (
+                            <SelectItem key={hour} value={`${hour.toString().padStart(2, "0")}:00`}>
+                              {hour.toString().padStart(2, "0")}:00
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Empresa</Label>
+                      <Select
+                        value={formData.empresaId}
+                        onValueChange={(v) => setFormData({ ...formData, empresaId: v, incidenciaIds: [] })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar empresa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {empresas?.map((empresa) => (
+                            <SelectItem key={empresa.id} value={empresa.id}>
+                              {empresa.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {empresaSeleccionada && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {empresaSeleccionada.tiposServicio.map((tipo) => (
+                            <Badge key={tipo} variant="outline" className="text-xs">
+                              {TIPO_SERVICIO_LABELS[tipo as TipoServicio]}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Notas (opcional)</Label>
+                      <Textarea
+                        placeholder="Instrucciones adicionales..."
+                        value={formData.notas}
+                        onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
-                {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Programar Visita
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+
+                {formData.empresaId && (
+                  <div className="space-y-2">
+                    <Label>Incidencias a resolver ({formData.incidenciaIds.length} seleccionadas)</Label>
+                    <div className="border rounded-lg max-h-48 overflow-y-auto">
+                      {incidenciasCompatibles.length > 0 ? (
+                        <div className="divide-y">
+                          {incidenciasCompatibles.map((inc) => (
+                            <div
+                              key={inc.id}
+                              className="flex items-center gap-3 p-3 hover:bg-gray-50"
+                            >
+                              <Checkbox
+                                id={inc.id}
+                                checked={formData.incidenciaIds.includes(inc.id)}
+                                onCheckedChange={() => handleIncidenciaToggle(inc.id)}
+                              />
+                              <label htmlFor={inc.id} className="flex-1 cursor-pointer">
+                                <p className="text-sm font-medium">{inc.descripcion}</p>
+                                <div className="flex gap-2 mt-1">
+                                  <Badge variant="outline" className="text-xs">
+                                    {TIPO_SERVICIO_LABELS[inc.tipoServicio as TipoServicio]}
+                                  </Badge>
+                                  {inc.prioridad === "URGENTE" && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Urgente
+                                    </Badge>
+                                  )}
+                                </div>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 p-4 text-center">
+                          No hay incidencias pendientes compatibles con esta empresa
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreate} disabled={createMutation.isPending}>
+                  {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Programar Visita
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -359,12 +432,27 @@ export default function CalendarioPage() {
               onMonthChange={setMonth}
               className="rounded-md border w-full"
               modifiers={{
-                hasVisita: fechasConVisitas,
+                programada: visitasPorEstado.programadas,
+                completada: visitasPorEstado.completadas,
+                cancelada: visitasPorEstado.canceladas,
               }}
               modifiersStyles={{
-                hasVisita: {
+                programada: {
                   fontWeight: "bold",
-                  backgroundColor: "rgb(219 234 254)",
+                  color: "white",
+                  backgroundColor: "rgb(37 99 235)", // blue-600
+                  borderRadius: "50%",
+                },
+                completada: {
+                  fontWeight: "bold",
+                  color: "white",
+                  backgroundColor: "rgb(22 163 74)", // green-600
+                  borderRadius: "50%",
+                },
+                cancelada: {
+                  fontWeight: "bold",
+                  color: "white",
+                  backgroundColor: "rgb(75 85 99)", // gray-600
                   borderRadius: "50%",
                 },
               }}
@@ -402,13 +490,12 @@ export default function CalendarioPage() {
                 {visitasDelDia.map((visita) => (
                   <div
                     key={visita.id}
-                    className={`p-3 rounded-lg border ${
-                      visita.estado === "COMPLETADA"
-                        ? "bg-green-50 border-green-200"
-                        : visita.estado === "CANCELADA"
+                    className={`p-3 rounded-lg border ${visita.estado === "COMPLETADA"
+                      ? "bg-green-50 border-green-200"
+                      : visita.estado === "CANCELADA"
                         ? "bg-gray-100 border-gray-200"
                         : "bg-blue-50 border-blue-200"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -421,7 +508,17 @@ export default function CalendarioPage() {
                         <p className="font-medium text-gray-900 mt-1">
                           {visita.empresa.nombre}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        {(visita.empresa.telefono || visita.empresa.email) && (
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            {visita.empresa.telefono && (
+                              <p className="text-[11px] text-gray-500">📞 {visita.empresa.telefono}</p>
+                            )}
+                            {visita.empresa.email && (
+                              <p className="text-[11px] text-gray-500">✉️ {visita.empresa.email}</p>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
                           {visita.incidencias.length} incidencia(s)
                         </p>
                       </div>
@@ -430,15 +527,15 @@ export default function CalendarioPage() {
                           visita.estado === "COMPLETADA"
                             ? "default"
                             : visita.estado === "CANCELADA"
-                            ? "secondary"
-                            : "outline"
+                              ? "secondary"
+                              : "outline"
                         }
                       >
                         {visita.estado === "PROGRAMADA"
                           ? "Programada"
                           : visita.estado === "COMPLETADA"
-                          ? "Completada"
-                          : "Cancelada"}
+                            ? "Completada"
+                            : "Cancelada"}
                       </Badge>
                     </div>
                     {visita.estado === "PROGRAMADA" && (
@@ -447,7 +544,7 @@ export default function CalendarioPage() {
                           size="sm"
                           variant="outline"
                           className="flex-1"
-                          onClick={() => handleComplete(visita.id)}
+                          onClick={() => openResolutionDialog(visita.id)}
                           disabled={updateMutation.isPending}
                         >
                           Completar
@@ -546,6 +643,37 @@ export default function CalendarioPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={resolutionOpen} onOpenChange={setResolutionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Completar Visita Técnica</DialogTitle>
+            <DialogDescription>
+              Ingrese las notas de resolución o hallazgos técnicos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="resolucion">Notas de Resolución</Label>
+            <Textarea
+              id="resolucion"
+              placeholder="Describa el trabajo realizado..."
+              value={notasResolucion}
+              onChange={(e) => setNotasResolucion(e.target.value)}
+              rows={4}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResolutionOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleComplete} disabled={updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar y Finalizar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

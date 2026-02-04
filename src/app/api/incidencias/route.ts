@@ -7,6 +7,7 @@ import {
   requireAuth,
 } from "@/lib/api-utils";
 import { createIncidenciaSchema } from "@/lib/validations";
+import { sendEmail, emailTemplates } from "@/lib/mail";
 
 // GET /api/incidencias - Listar incidencias
 // Supports pagination with ?page=1&limit=50 (optional, defaults to all results for backward compatibility)
@@ -151,6 +152,25 @@ export async function POST(request: NextRequest) {
             tipo: "URGENCIA",
           })),
         });
+
+        // Enviar correos a los admins
+        const adminsWithEmail = await prisma.usuario.findMany({
+          where: {
+            id: { in: admins.map((a) => a.usuarioId) },
+          },
+          select: { email: true },
+        });
+
+        const template = emailTemplates.nuevaIncidencia(incidencia.id, incidencia.descripcion);
+        await Promise.all(
+          adminsWithEmail.map((admin) =>
+            sendEmail({
+              to: admin.email!,
+              subject: template.subject,
+              html: template.html,
+            })
+          )
+        );
       }
     }
 

@@ -20,6 +20,7 @@ export const estadoIncidenciaEnum = z.enum([
   "EN_PROGRESO",
   "RESUELTA",
   "CERRADA",
+  "RECHAZADA",
 ]);
 
 export const estadoVisitaEnum = z.enum(["PROGRAMADA", "EN_PROGRESO", "COMPLETADA", "CANCELADA"]);
@@ -89,6 +90,11 @@ export const resolverConserjeSchema = z.object({
 export const escalarIncidenciaSchema = z.object({
   descripcionVerificada: z.string().min(10, "Describa la situación verificada"),
   prioridad: prioridadEnum.optional(),
+});
+
+// Schema para rechazar incidencia (Admin only)
+export const rechazarIncidenciaSchema = z.object({
+  motivoRechazo: z.string().min(10, "El motivo debe tener al menos 10 caracteres"),
 });
 
 // Schemas de Edificios
@@ -199,6 +205,7 @@ export type UpdateIncidenciaInput = z.infer<typeof updateIncidenciaSchema>;
 export type AsignarConserjeInput = z.infer<typeof asignarConserjeSchema>;
 export type ResolverConserjeInput = z.infer<typeof resolverConserjeSchema>;
 export type EscalarIncidenciaInput = z.infer<typeof escalarIncidenciaSchema>;
+export type RechazarIncidenciaInput = z.infer<typeof rechazarIncidenciaSchema>;
 export type CreateEdificioInput = z.infer<typeof createEdificioSchema>;
 export type UpdateEdificioInput = z.infer<typeof updateEdificioSchema>;
 export type CreateEmpresaInput = z.infer<typeof createEmpresaSchema>;

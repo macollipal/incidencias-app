@@ -7,6 +7,7 @@ import {
   requireAuth,
 } from "@/lib/api-utils";
 import { createComentarioSchema } from "@/lib/validations";
+import { sendEmail, emailTemplates } from "@/lib/mail";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -66,7 +67,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const incidencia = await prisma.incidencia.findUnique({
       where: { id },
-      select: { edificioId: true, usuarioId: true, estado: true },
+      select: {
+        id: true,
+        edificioId: true,
+        usuarioId: true,
+        asignadoAId: true,
+        estado: true,
+        descripcion: true
+      },
     });
 
     if (!incidencia) {
@@ -108,6 +116,63 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         },
       },
     });
+
+    // --- Lógica de Notificaciones ---
+    const targets = new Set<string>();
+
+    // 1. Notificar al creador de la incidencia si no es el autor del comentario
+    if (incidencia.usuarioId !== session.user.id) {
+      targets.add(incidencia.usuarioId);
+    }
+
+    // 2. Notificar al conserje asignado si no es el autor
+    if (incidencia.asignadoAId && incidencia.asignadoAId !== session.user.id) {
+      targets.add(incidencia.asignadoAId);
+    }
+
+    // 3. Si un residente comenta, notificar a los admins del edificio
+    if (session.user.rol === "RESIDENTE") {
+      const admins = await prisma.usuarioEdificio.findMany({
+        where: {
+          edificioId: incidencia.edificioId,
+          usuario: {
+            rol: { in: ["ADMIN_PLATAFORMA", "ADMIN_EDIFICIO"] },
+          },
+        },
+        select: { usuarioId: true },
+      });
+      admins.forEach((a) => targets.add(a.usuarioId));
+    }
+
+    if (targets.size > 0) {
+      const targetIds = Array.from(targets);
+
+      // Crear notificaciones en DB
+      await prisma.notificacion.createMany({
+        data: targetIds.map((userId) => ({
+          usuarioId: userId,
+          incidenciaId: id,
+          tipo: "COMENTARIO",
+        })),
+      });
+
+      // Enviar correos
+      const usersWithEmail = await prisma.usuario.findMany({
+        where: { id: { in: targetIds } },
+        select: { email: true },
+      });
+
+      const template = emailTemplates.nuevoComentario(incidencia.id, incidencia.descripcion, contenido);
+      await Promise.all(
+        usersWithEmail.map((u) =>
+          sendEmail({
+            to: u.email,
+            subject: template.subject,
+            html: template.html,
+          })
+        )
+      );
+    }
 
     return successResponse(comentario, 201);
   } catch (error) {

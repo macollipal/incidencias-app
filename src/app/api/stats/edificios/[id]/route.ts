@@ -72,12 +72,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         prisma.incidencia.count({
           where: { ...baseWhere, estado: "PENDIENTE" },
         }),
-        // Incidencias urgentes activas
+        // Incidencias urgentes activas (excluye cerradas, resueltas y rechazadas)
         prisma.incidencia.count({
           where: {
             ...baseWhere,
             prioridad: "URGENTE",
-            estado: { notIn: ["CERRADA", "RESUELTA"] },
+            estado: { notIn: ["CERRADA", "RESUELTA", "RECHAZADA"] },
           },
         }),
         // Incidencias programadas
@@ -92,12 +92,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             closedAt: { gte: hoy },
           },
         }),
-        // Agrupadas por tipo de servicio
+        // Agrupadas por tipo de servicio (excluye estados terminales)
         prisma.incidencia.groupBy({
           by: ["tipoServicio"],
           where: {
             ...baseWhere,
-            estado: { notIn: ["CERRADA", "RESUELTA"] },
+            estado: { notIn: ["CERRADA", "RESUELTA", "RECHAZADA"] },
           },
           _count: true,
         }),
@@ -134,12 +134,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }));
     }
 
-    // Incidencias urgentes activas con detalles
+    // Incidencias urgentes activas con detalles (excluye estados terminales)
     const incidenciasUrgentes = await prisma.incidencia.findMany({
       where: {
         ...baseWhere,
         prioridad: "URGENTE",
-        estado: { notIn: ["CERRADA", "RESUELTA"] },
+        estado: { notIn: ["CERRADA", "RESUELTA", "RECHAZADA"] },
       },
       include: {
         usuario: { select: { nombre: true } },

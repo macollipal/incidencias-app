@@ -7,6 +7,7 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 import { escalarIncidenciaSchema } from "@/lib/validations";
+import { sendEmail, emailTemplates } from "@/lib/mail";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -80,6 +81,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           tipo: prioridad === "URGENTE" ? "URGENCIA" : "RECORDATORIO",
         })),
       });
+
+      // Enviar correos a los admins
+      const adminsWithEmail = await prisma.usuario.findMany({
+        where: {
+          id: { in: admins.map((a) => a.usuarioId) },
+        },
+        select: { email: true },
+      });
+
+      const template = emailTemplates.incidenciaEscalada(incidencia.id, incidencia.descripcion);
+      await Promise.all(
+        adminsWithEmail.map((admin) =>
+          sendEmail({
+            to: admin.email,
+            subject: template.subject,
+            html: template.html,
+          })
+        )
+      );
     }
 
     return successResponse(updated);

@@ -37,6 +37,7 @@ enum EstadoIncidencia {
   EN_PROGRESO        // Empresa trabajando
   RESUELTA           // Solucionada (por conserje o empresa)
   CERRADA            // Cerrada definitivamente
+  RECHAZADA          // Rechazada por admin (no aplica, duplicada, error)
 }
 
 enum TipoResolucion {
@@ -179,6 +180,10 @@ model Incidencia {
   tipoResolucion    TipoResolucion? @map("tipo_resolucion")
   comentarioCierre  String?         @map("comentario_cierre")
 
+  // Campos para rechazo
+  rechazadaEl       DateTime?       @map("rechazada_el")
+  motivoRechazo     String?         @map("motivo_rechazo")
+
   edificio       Edificio       @relation(fields: [edificioId], references: [id], onDelete: Cascade)
   usuario        Usuario        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   asignadoA      Usuario?       @relation("IncidenciasAsignadas", fields: [asignadoAId], references: [id], onDelete: SetNull)
@@ -318,4 +323,10 @@ model MovimientoStock {
   @@index([productoId])
   @@index([incidenciaId])
   @@map("movimientos_stock")
+}
+model Configuracion {
+  key   String @id
+  value String
+
+  @@map("configuraciones")
 }

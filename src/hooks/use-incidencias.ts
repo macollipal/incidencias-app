@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreateIncidenciaInput, UpdateIncidenciaInput, AsignarConserjeInput, ResolverConserjeInput, EscalarIncidenciaInput } from "@/lib/validations";
+import { CreateIncidenciaInput, UpdateIncidenciaInput, AsignarConserjeInput, ResolverConserjeInput, EscalarIncidenciaInput, RechazarIncidenciaInput } from "@/lib/validations";
 import { PaginatedResponse } from "@/types";
 
 interface Usuario {
@@ -36,6 +36,9 @@ interface Incidencia {
   escaladaEl: string | null;
   tipoResolucion: string | null;
   comentarioCierre: string | null;
+  // Campos del flujo de rechazo
+  rechazadaEl: string | null;
+  motivoRechazo: string | null;
   usuario: Usuario;
   asignadoA?: Usuario | null;
   visita?: {
@@ -266,6 +269,24 @@ export function useEscalarIncidencia() {
       queryClient.invalidateQueries({ queryKey: ["incidencia", data.id] });
       queryClient.invalidateQueries({ queryKey: ["edificio-stats", data.edificioId] });
       queryClient.invalidateQueries({ queryKey: ["conserjes", data.edificioId] });
+    },
+  });
+}
+
+// Workflow: Admin rechaza incidencia
+export function useRechazarIncidencia() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: RechazarIncidenciaInput }) =>
+      fetchApi<Incidencia>(`/api/incidencias/${id}/rechazar`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["incidencias", data.edificioId] });
+      queryClient.invalidateQueries({ queryKey: ["incidencia", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["edificio-stats", data.edificioId] });
     },
   });
 }

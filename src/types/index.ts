@@ -17,7 +17,8 @@ export type EstadoIncidencia =
   | "PROGRAMADA"
   | "EN_PROGRESO"
   | "RESUELTA"
-  | "CERRADA";
+  | "CERRADA"
+  | "RECHAZADA";
 
 export type EstadoVisita = "PROGRAMADA" | "COMPLETADA" | "CANCELADA";
 
@@ -68,6 +69,7 @@ export const ESTADO_INCIDENCIA_LABELS: Record<EstadoIncidencia, string> = {
   EN_PROGRESO: "En Progreso",
   RESUELTA: "Resuelta",
   CERRADA: "Cerrada",
+  RECHAZADA: "Rechazada",
 };
 
 export const ROL_LABELS: Record<Rol, string> = {
@@ -91,6 +93,7 @@ export const ESTADO_INCIDENCIA_COLORS: Record<EstadoIncidencia, string> = {
   EN_PROGRESO: "bg-yellow-100 text-yellow-800",
   RESUELTA: "bg-green-100 text-green-800",
   CERRADA: "bg-gray-100 text-gray-600",
+  RECHAZADA: "bg-red-100 text-red-800",
 };
 
 // Labels para inventario

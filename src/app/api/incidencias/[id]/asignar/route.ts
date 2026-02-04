@@ -7,6 +7,7 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 import { asignarConserjeSchema } from "@/lib/validations";
+import { sendEmail, emailTemplates } from "@/lib/mail";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -70,6 +71,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         asignadoA: { select: { id: true, nombre: true } },
       },
     });
+
+    // Crear notificación para el conserje
+    await prisma.notificacion.create({
+      data: {
+        usuarioId: asignadoAId,
+        incidenciaId: updated.id,
+        tipo: "ASIGNACION",
+      },
+    });
+
+    // Enviar correo al conserje
+    if (conserje.email) {
+      const template = emailTemplates.incidenciaAsignada(updated.id, updated.descripcion);
+      await sendEmail({
+        to: conserje.email,
+        subject: template.subject,
+        html: template.html,
+      });
+    }
 
     return successResponse(updated);
   } catch (error) {

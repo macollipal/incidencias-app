@@ -15,8 +15,12 @@ import {
   Users,
   LogOut,
   LayoutDashboard,
+  Bell,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { ROL_LABELS, type Rol } from "@/types";
+import { useNotificacionesNoLeidas } from "@/hooks/use-notificaciones";
+import { usePublicConfig } from "@/hooks/use-config";
 
 type NavItem = {
   name: string;
@@ -45,6 +49,12 @@ const navigation: NavItem[] = [
     roles: ["ADMIN_PLATAFORMA", "ADMIN_EDIFICIO", "CONSERJE", "RESIDENTE"],
   },
   {
+    name: "Notificaciones",
+    href: "/notificaciones",
+    icon: Bell,
+    roles: ["ADMIN_PLATAFORMA", "ADMIN_EDIFICIO", "CONSERJE", "RESIDENTE"],
+  },
+  {
     name: "Calendario",
     href: "/calendario",
     icon: Calendar,
@@ -62,11 +72,19 @@ const navigation: NavItem[] = [
     icon: Users,
     roles: ["ADMIN_PLATAFORMA"],
   },
+  {
+    name: "Configuración",
+    href: "/configuracion",
+    icon: SettingsIcon,
+    roles: ["ADMIN_PLATAFORMA"],
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { data: notificacionesNoLeidas } = useNotificacionesNoLeidas();
+  const { data: config } = usePublicConfig();
 
   const userRole = (session?.user?.rol as Rol) || "RESIDENTE";
 
@@ -85,13 +103,16 @@ export function Sidebar() {
   return (
     <aside className="flex flex-col w-64 bg-white border-r min-h-screen">
       <div className="p-6 border-b">
-        <h1 className="text-xl font-bold text-gray-900">Incidencias</h1>
+        <h1 className="text-xl font-bold text-gray-900">
+          {config?.APP_NAME || "Incidencias"}
+        </h1>
         <p className="text-sm text-gray-500 mt-1">Gestión de edificios</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
         {filteredNavigation.map((item) => {
           const isActive = pathname.startsWith(item.href);
+          const showBadge = item.href === "/notificaciones" && notificacionesNoLeidas && notificacionesNoLeidas > 0;
           return (
             <Link
               key={item.name}
@@ -105,6 +126,11 @@ export function Sidebar() {
             >
               <item.icon className="w-5 h-5" />
               {item.name}
+              {showBadge && (
+                <Badge className="ml-auto bg-blue-600 text-white animate-pulse">
+                  {notificacionesNoLeidas}
+                </Badge>
+              )}
             </Link>
           );
         })}

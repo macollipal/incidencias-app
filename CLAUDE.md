@@ -8,9 +8,11 @@ Plataforma web para la gestión de incidencias en edificios residenciales.
 - **Backend**: Next.js API Routes, Prisma v5.22 ORM
 - **Base de datos**: PostgreSQL
 - **Autenticación**: NextAuth.js v5 (Credentials Provider, bcryptjs)
+- **Comunicaciones**: Resend (API de correo), templates en `src/lib/mail.ts`
+- **Configuración**: Sistema de preferencias dinámicas (Branding, Colores, API Keys)
 - **State Management**: TanStack Query v5.90, Zustand v5
 - **Validación**: Zod, React Hook Form
-- **UI**: Lucide React (iconos), Sonner (toasts), date-fns
+- **UI**: Lucide React (iconos), Sonner (toasts), date-fns, react-day-picker (calendario)
 
 ## Requisitos
 
@@ -19,35 +21,35 @@ Plataforma web para la gestión de incidencias en edificios residenciales.
 
 ## Configuración Inicial
 
-1. **Instalar dependencias**:
-   ```bash
-   npm install
-   ```
+1.  **Instalar dependencias**:
+    ```bash
+    npm install
+    ```
 
-2. **Configurar base de datos**:
+2.  **Configurar base de datos**:
 
-   Opción A - Docker:
-   ```bash
-   docker run --name postgres-incidencias -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=incidencias -p 5432:5432 -d postgres
-   ```
+    Opción A - Docker:
+    ```bash
+    docker run --name postgres-incidencias -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=incidencias -p 5432:5432 -d postgres
+    ```
 
-   Opción B - PostgreSQL local instalado
+    Opción B - PostgreSQL local instalado
 
-3. **Configurar variables de entorno**:
-   - Copiar `.env.example` a `.env`
-   - Ajustar `DATABASE_URL` si es necesario
-   - Generar `AUTH_SECRET`: `openssl rand -base64 32`
+3.  **Configurar variables de entorno**:
+    - Copiar `.env.example` a `.env`
+    - Ajustar `DATABASE_URL` si es necesario
+    - Generar `AUTH_SECRET`: `openssl rand -base64 32`
 
-4. **Crear tablas y datos de prueba**:
-   ```bash
-   npm run db:push
-   npm run db:seed
-   ```
+4.  **Crear tablas y datos de prueba**:
+    ```bash
+    npm run db:push
+    npm run db:seed
+    ```
 
-5. **Iniciar servidor de desarrollo**:
-   ```bash
-   npm run dev
-   ```
+5.  **Iniciar servidor de desarrollo**:
+    ```bash
+    npm run dev
+    ```
 
 ## Credenciales de Prueba
 
@@ -85,18 +87,27 @@ src/
 │   │   ├── edificios/page.tsx       # CRUD edificios
 │   │   ├── empresas/page.tsx        # Catálogo empresas
 │   │   ├── usuarios/page.tsx        # Gestión usuarios
-│   │   └── calendario/page.tsx      # Calendario visitas
+│   │   ├── calendario/page.tsx      # Calendario visitas (con filtros y estados)
+│   │   ├── configuracion/page.tsx   # Panel de administración (Branding, Email, DB)
+│   │   ├── notificaciones/page.tsx  # Centro de notificaciones
+│   │   └── inventario/page.tsx      # Gestión de stock y movimientos
 │   ├── api/
 │   │   ├── auth/[...nextauth]/route.ts
+│   │   ├── config/                  # API de configuración del sistema
+│   │   ├── notificaciones/          # API de notificaciones
+│   │   ├── inventario/              # API de inventario y movimientos
 │   │   ├── incidencias/
 │   │   │   ├── route.ts             # GET (listar), POST (crear)
 │   │   │   ├── [id]/route.ts        # GET, PATCH, DELETE
 │   │   │   ├── [id]/asignar/route.ts
 │   │   │   ├── [id]/resolver/route.ts
 │   │   │   ├── [id]/escalar/route.ts
-│   │   │   └── [id]/comentarios/route.ts
+│   │   │   ├── [id]/rechazar/route.ts
+│   │   │   ├── [id]/comentarios/route.ts
+│   │   │   └── [id]/fotos/route.ts
 │   │   ├── edificios/
 │   │   │   ├── route.ts
+│   │   │   └── [id]/zonas/route.ts
 │   │   │   └── [id]/
 │   │   │       ├── route.ts
 │   │   │       └── conserjes/route.ts
@@ -124,7 +135,7 @@ src/
 ├── hooks/
 │   ├── use-edificio.ts              # Zustand store para edificio activo
 │   ├── use-edificios.ts             # 5 hooks: list, detail, stats, CRUD
-│   ├── use-incidencias.ts           # 12 hooks: CRUD + workflow completo
+│   ├── use-incidencias.ts           # 13 hooks: CRUD + workflow completo
 │   ├── use-usuarios.ts              # 5 hooks: CRUD usuarios
 │   ├── use-empresas.ts              # 5 hooks: CRUD empresas
 │   ├── use-visitas.ts               # 5 hooks: CRUD visitas
@@ -149,19 +160,26 @@ src/
 ### Diagrama del Flujo
 
 ```
+                                    ┌─────────────────┐
+                                    │   RECHAZADA     │ (Terminal - No afecta métricas)
+                                    │   [Admin only]  │
+                                    └─────────────────┘
+                                           ▲
+                                           │ (motivo obligatorio)
+                                           │
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │  PENDIENTE  │────▶│  ASIGNADA   │────▶│  ESCALADA   │────▶│ PROGRAMADA  │
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                           │                                       │
-                           │ (Conserje resuelve)                   │
-                           ▼                                       ▼
-                    ┌─────────────┐                         ┌─────────────┐
-                    │  RESUELTA   │◀────────────────────────│ EN_PROGRESO │
-                    └─────────────┘                         └─────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │   CERRADA   │
+       │                   │                                       │
+       │                   │ (Conserje resuelve)                   │
+       │                   ▼                                       ▼
+       │            ┌─────────────┐                         ┌─────────────┐
+       │            │  RESUELTA   │◀────────────────────────│ EN_PROGRESO │
+       │            └─────────────┘                         └─────────────┘
+       │                   │
+       │                   ▼
+       │            ┌─────────────┐
+       └───────────▶│   CERRADA   │ (Terminal - Sí afecta métricas)
                     └─────────────┘
 ```
 
@@ -176,18 +194,38 @@ src/
 | EN_PROGRESO | Empresa trabajando |
 | RESUELTA | Solucionada (por conserje o empresa) |
 | CERRADA | Cerrada definitivamente |
+| RECHAZADA | Rechazada por admin (duplicada, no aplica, error) |
+
+### Estado RECHAZADA
+
+**Propósito**: Distinguir incidencias inválidas de incidencias gestionadas correctamente.
+
+| Regla | Descripción |
+|-------|-------------|
+| Transición válida | Solo desde `PENDIENTE` → `RECHAZADA` |
+| Roles autorizados | `ADMIN_PLATAFORMA`, `ADMIN_EDIFICIO` |
+| Motivo obligatorio | `motivoRechazo` mínimo 10 caracteres |
+| Estado terminal | No permite transiciones posteriores |
+| Métricas | Excluida de indicadores de gestión y tiempo de resolución |
+
+**Casos de uso típicos**:
+- Incidencia duplicada
+- No aplica al edificio
+- Creada por error
+- Información insuficiente
+- Solicitud fuera de alcance
 
 ### Flujo Detallado
 
-1. **Residente crea incidencia** → Estado: `PENDIENTE`
-2. **Admin asigna a conserje** → Estado: `ASIGNADA`
-3. **Conserje verifica en terreno**:
-   - Si puede resolver → Estado: `RESUELTA` (tipo: CONSERJE)
-   - Si requiere empresa → Estado: `ESCALADA`
-4. **Admin programa visita** → Estado: `PROGRAMADA`
-5. **Empresa trabaja** → Estado: `EN_PROGRESO`
-6. **Empresa termina** → Estado: `RESUELTA` (tipo: EMPRESA_EXTERNA)
-7. **Admin cierra** → Estado: `CERRADA`
+1.  **Residente crea incidencia** → Estado: `PENDIENTE`
+2.  **Admin asigna a conserje** → Estado: `ASIGNADA`
+3.  **Conserje verifica en terreno**:
+    - Si puede resolver → Estado: `RESUELTA` (tipo: CONSERJE)
+    - Si requiere empresa → Estado: `ESCALADA`
+4.  **Admin programa visita** → Estado: `PROGRAMADA`
+5.  **Empresa trabaja** → Estado: `EN_PROGRESO`
+6.  **Empresa termina** → Estado: `RESUELTA` (tipo: EMPRESA_EXTERNA)
+7.  **Admin cierra** → Estado: `CERRADA`
 
 ---
 
@@ -232,6 +270,7 @@ src/
 | POST | `/api/incidencias/[id]/asignar` | Asignar a conserje | Admin |
 | POST | `/api/incidencias/[id]/resolver` | Resolver | Conserje |
 | POST | `/api/incidencias/[id]/escalar` | Escalar a admin | Conserje |
+| POST | `/api/incidencias/[id]/rechazar` | Rechazar incidencia | Admin |
 | GET | `/api/incidencias/[id]/comentarios` | Ver comentarios | Todos |
 | POST | `/api/incidencias/[id]/comentarios` | Agregar comentario | Todos |
 
@@ -361,7 +400,7 @@ useRegistrarMovimiento()
 ```prisma
 enum Rol { ADMIN_PLATAFORMA, ADMIN_EDIFICIO, CONSERJE, RESIDENTE }
 enum TipoServicio { ELECTRICIDAD, AGUA_GAS, LIMPIEZA, SEGURIDAD, INFRAESTRUCTURA, AREAS_COMUNES }
-enum EstadoIncidencia { PENDIENTE, ASIGNADA, ESCALADA, PROGRAMADA, EN_PROGRESO, RESUELTA, CERRADA }
+enum EstadoIncidencia { PENDIENTE, ASIGNADA, ESCALADA, PROGRAMADA, EN_PROGRESO, RESUELTA, CERRADA, RECHAZADA }
 enum Prioridad { NORMAL, URGENTE }
 enum EstadoVisita { PROGRAMADA, EN_PROGRESO, COMPLETADA, CANCELADA }
 enum TipoResolucion { CONSERJE, EMPRESA_EXTERNA }
@@ -369,15 +408,15 @@ enum TipoResolucion { CONSERJE, EMPRESA_EXTERNA }
 
 ### Modelos Principales
 
-- **Usuario** - Usuarios con roles y edificios asignados
-- **Edificio** - Edificios/propiedades
-- **UsuarioEdificio** - Relación muchos a muchos
-- **Empresa** - Empresas de servicio externo
-- **Incidencia** - Incidencias con workflow completo
-- **Visita** - Visitas técnicas programadas
-- **ComentarioIncidencia** - Comentarios en incidencias
-- **Notificacion** - Notificaciones de usuario
-- **ZonaEdificio**, **Producto**, **ProductoZona**, **MovimientoStock** - Inventario
+-   **Usuario** - Usuarios con roles y edificios asignados
+-   **Edificio** - Edificios/propiedades
+-   **UsuarioEdificio** - Relación muchos a muchos
+-   **Empresa** - Empresas de servicio externo
+-   **Incidencia** - Incidencias con workflow completo
+-   **Visita** - Visitas técnicas programadas
+-   **ComentarioIncidencia** - Comentarios en incidencias
+-   **Notificacion** - Notificaciones de usuario
+-   **ZonaEdificio**, **Producto**, **ProductoZona**, **MovimientoStock** - Inventario
 
 ---
 
@@ -427,6 +466,7 @@ if (!isHydrated) return <Loading />;
 - [x] Flujo de conserje (asignar/resolver/escalar)
 - [x] **UI de acciones del conserje** (resolver/escalar desde modal)
 - [x] **Asignación de conserje por admin** (selector con carga de trabajo)
+- [x] **Rechazo de incidencias** (estado RECHAZADA, solo admin, desde PENDIENTE)
 - [x] Sistema de comentarios
 - [x] Calendario de visitas
 - [x] Catálogo de empresas
@@ -445,13 +485,13 @@ if (!isHydrated) return <Loading />;
 ### Tabla de Incidencias
 
 Columnas ordenadas para escaneo rápido:
-1. **Fecha** - Día/mes + hora (formato compacto)
-2. **Descripción** - Texto truncado
-3. **Tipo** - Badge con categoría
-4. **Prioridad** - Normal/Urgente con icono
-5. **Estado** - Badge con icono y color
-6. **Reportado por** - Nombre del usuario
-7. **Acciones** - Botones según rol y estado
+1.  **Fecha** - Día/mes + hora (formato compacto)
+2.  **Descripción** - Texto truncado
+3.  **Tipo** - Badge con categoría
+4.  **Prioridad** - Normal/Urgente con icono
+5.  **Estado** - Badge con icono y color
+6.  **Reportado por** - Nombre del usuario
+7.  **Acciones** - Botones según rol y estado
 
 ### Estados Visuales
 
@@ -464,19 +504,20 @@ Columnas ordenadas para escaneo rápido:
 | En Progreso | Amarillo | Wrench |
 | Resuelta | Verde | CheckCircle2 |
 | Cerrada | Gris | XCircle |
+| Rechazada | Rojo | Ban |
 
 ### Modal de Detalle
 
 Estructura con áreas fijas y scrollables:
-- **Header fijo**: Título + estado
-- **Contenido scrollable**: Info + Timeline + Comentarios
-- **Footer fijo**: Input de comentario + botón cerrar
+-   **Header fijo**: Título + estado
+-   **Contenido scrollable**: Info + Timeline + Comentarios
+-   **Footer fijo**: Input de comentario + botón cerrar
 
 ### Acciones por Rol
 
 | Rol | Estado | Acciones |
 |-----|--------|----------|
-| Admin | PENDIENTE | Asignar, Marcar urgente, Cerrar |
+| Admin | PENDIENTE | Asignar, Rechazar, Marcar urgente, Cerrar |
 | Admin | ESCALADA | Asignar, Programar visita, Cerrar |
 | Conserje | ASIGNADA (a él) | Resolver, Escalar |
 | Residente | Cualquiera | Ver (solo lectura) |
@@ -484,10 +525,10 @@ Estructura con áreas fijas y scrollables:
 ### Panel de Acciones del Conserje
 
 Cuando una incidencia está ASIGNADA al conserje logueado, se muestra:
-- Campo de verificación/análisis técnico
-- Campo de solución aplicada
-- Opción de marcar como urgente (al escalar)
-- Botones: "Resolver Incidencia" / "Escalar a Administrador"
+-   Campo de verificación/análisis técnico
+-   Campo de solución aplicada
+-   Opción de marcar como urgente (al escalar)
+-   Botones: "Resolver Incidencia" / "Escalar a Administrador"
 
 ---
 
@@ -505,9 +546,9 @@ Cuando una incidencia está ASIGNADA al conserje logueado, se muestra:
 
 ### URLs de Producción
 
-- **App**: https://incidencias-app.vercel.app (o tu dominio personalizado)
-- **Repositorio**: https://github.com/macollipal/incidencias-app
-- **Base de datos**: Neon PostgreSQL (us-east-1)
+-   **App**: https://incidencias-app.vercel.app (o tu dominio personalizado)
+-   **Repositorio**: https://github.com/macollipal/incidencias-app
+-   **Base de datos**: Neon PostgreSQL (us-east-1)
 
 ### Variables de Entorno en Vercel
 
@@ -518,24 +559,24 @@ Cuando una incidencia está ASIGNADA al conserje logueado, se muestra:
 
 ### Despliegue Automático
 
-- Push a `main` → Vercel hace deploy automático
-- El build ejecuta `prisma generate && next build`
+-   Push a `main` → Vercel hace deploy automático
+-   El build ejecuta `prisma generate && next build`
 
 ### Configuración de Neon
 
-1. Crear proyecto en https://neon.tech
-2. Copiar connection string (formato Prisma)
-3. Ejecutar migraciones:
-   ```bash
-   DATABASE_URL="postgresql://..." npx prisma db push
-   DATABASE_URL="postgresql://..." npm run db:seed
-   ```
+1.  Crear proyecto en https://neon.tech
+2.  Copiar connection string (formato Prisma)
+3.  Ejecutar migraciones:
+    ```bash
+    DATABASE_URL="postgresql://..." npx prisma db push
+    DATABASE_URL="postgresql://..." npm run db:seed
+    ```
 
 ### Notas de Despliegue
 
-- Las API routes usan `export const dynamic = "force-dynamic"` para evitar pre-rendering
-- Prisma Client se genera durante el build (`prisma generate`)
-- ESLint configurado con extensiones `.js` para compatibilidad con Vercel
+-   Las API routes usan `export const dynamic = "force-dynamic"` para evitar pre-rendering
+-   Prisma Client se genera durante el build (`prisma generate`)
+-   ESLint configurado con extensiones `.js` para compatibilidad con Vercel
 
 ---
 
@@ -545,21 +586,31 @@ Cuando una incidencia está ASIGNADA al conserje logueado, se muestra:
 El store de Zustand usa `persist` para localStorage. Usar `useEdificioStoreHydrated()` en lugar de `useEdificioStore()`.
 
 ### Prisma
-- Schema en `prisma/schema.prisma`
-- Migraciones: `npm run db:push` (desarrollo)
-- Datos de prueba: `npm run db:seed`
+-   Schema en `prisma/schema.prisma`
+-   Migraciones: `npm run db:push` (desarrollo)
+-   Datos de prueba: `npm run db:seed`
 
 ### Validaciones
-- Zod para schemas en `src/lib/validations.ts`
-- Validación en cliente (React Hook Form) y servidor (API routes)
+-   Zod para schemas en `src/lib/validations.ts`
+-   Validación en cliente (React Hook Form) y servidor (API routes)
 
 ### Middleware
-- Protege todas las rutas excepto `/` y `/api/auth`
-- Redirige no autenticados a `/login`
+-   Protege todas las rutas excepto `/` y `/api/auth`
+-   Redirige no autenticados a `/login`
 
 ### Navegación por Rol
 El sidebar filtra items según rol:
-- **Admin Plataforma**: Todo
-- **Admin Edificio**: Dashboard, Incidencias, Calendario, Empresas
-- **Conserje**: Dashboard, Incidencias
-- **Residente**: Dashboard, Incidencias
+-   **Admin Plataforma**: Todo (incluye Usuarios, Configuración, Inventario)
+-   **Admin Edificio**: Dashboard, Edificios, Incidencias, Calendario, Empresas, Inventario
+-   **Conserje**: Dashboard, Edificios, Incidencias, Calendario, Inventario
+-   **Residente**: Dashboard, Incidencias, Notificaciones
+
+### Sistema de Tema Dinámico
+La aplicación permite personalizar el color primario desde el menú de Configuración.
+- El componente `ThemeInitializer` lee el color de la DB y lo inyecta como la variable CSS `--primary`.
+- El nombre de la aplicación también es dinámico y se refleja en el Sidebar y el título de la página.
+
+### Notificaciones y Email
+- Se integró **Resend** para notificaciones por correo electrónico.
+- Eventos que disparan email: Nueva incidencia urgente, Asignación de técnico, Escalado a admin, Nuevos comentarios, Programación de visitas.
+- Las notificaciones internas se marcan como leídas automáticamente al ver la incidencia relacionada.

@@ -8,6 +8,9 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 import { createVisitaSchema } from "@/lib/validations";
+import { sendEmail, emailTemplates } from "@/lib/mail";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 // GET /api/visitas - Listar visitas
 // Supports pagination with ?page=1&limit=25 (optional, defaults to all results for backward compatibility)
@@ -173,10 +176,45 @@ export async function POST(request: NextRequest) {
             id: true,
             descripcion: true,
             tipoServicio: true,
+            usuario: { select: { email: true } },
+            asignadoA: { select: { email: true } },
           },
         },
       },
     });
+
+    // --- Notificaciones por Email ---
+    if (result && result.incidencias.length > 0) {
+      const fechaFormateada = format(new Date(result.fechaProgramada), "EEEE d 'de' MMMM 'a las' HH:mm", { locale: es });
+
+      const emailTasks = result.incidencias.flatMap((inc) => {
+        const tasks = [];
+        const template = emailTemplates.visitaProgramada(inc.id, fechaFormateada, result.empresa.nombre);
+
+        // Notificar al residente
+        if (inc.usuario.email) {
+          tasks.push(sendEmail({
+            to: inc.usuario.email,
+            subject: template.subject,
+            html: template.html,
+          }));
+        }
+
+        // Notificar al conserje si hay uno asignado
+        if (inc.asignadoA?.email) {
+          tasks.push(sendEmail({
+            to: inc.asignadoA.email,
+            subject: template.subject,
+            html: template.html,
+          }));
+        }
+
+        return tasks;
+      });
+
+      // No esperamos al envío de correos para responder al cliente
+      Promise.all(emailTasks).catch(err => console.error("Error enviando correos de visita:", err));
+    }
 
     return successResponse(result, 201);
   } catch (error) {
