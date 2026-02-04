@@ -281,7 +281,7 @@ export function useCreateProducto() {
       }
       return res.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
     },
   });

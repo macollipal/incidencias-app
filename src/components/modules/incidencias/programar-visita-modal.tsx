@@ -26,7 +26,7 @@ import { useCreateVisita } from "@/hooks/use-visitas";
 import { toast } from "sonner";
 
 interface ProgramarVisitaModalProps {
-    incidencia: any | null;
+    incidencia: { id: string; descripcion: string } | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     edificioId: string;
