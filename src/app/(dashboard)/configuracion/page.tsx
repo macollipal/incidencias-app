@@ -34,7 +34,13 @@ export default function ConfiguracionPage() {
 
     useEffect(() => {
         if (configData?.configs) {
-            setFormData(configData.configs);
+            const filtered: Record<string, string> = {};
+            for (const [key, value] of Object.entries(configData.configs)) {
+                if (value !== undefined) {
+                    filtered[key] = value;
+                }
+            }
+            setFormData(filtered);
         }
     }, [configData]);
 
