@@ -39,7 +39,6 @@ export default function CalendarioPage() {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [month, setMonth] = useState<Date | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedVisita, setSelectedVisita] = useState<string | null>(null);
   const [filterEstado, setFilterEstado] = useState<string>("TODOS");
   const [filterEmpresa, setFilterEmpresa] = useState<string>("TODAS");
   const [filterServicio, setFilterServicio] = useState<string>("TODOS");
@@ -102,13 +101,13 @@ export default function CalendarioPage() {
 
   // Empresa seleccionada para filtrar incidencias
   const empresaSeleccionada = empresas?.find((e) => e.id === formData.empresaId);
-  const tiposEmpresa = empresaSeleccionada?.tiposServicio || [];
 
   // Incidencias compatibles con la empresa seleccionada
   const incidenciasCompatibles = useMemo(() => {
+    const tiposEmpresa = empresaSeleccionada?.tiposServicio || [];
     if (!incidencias || tiposEmpresa.length === 0) return [];
     return incidencias.filter((i) => tiposEmpresa.includes(i.tipoServicio));
-  }, [incidencias, tiposEmpresa]);
+  }, [incidencias, empresaSeleccionada?.tiposServicio]);
 
   if (!isHydrated || !selectedEdificioId) {
     return (

@@ -3,7 +3,6 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   successResponse,
-  errorResponse,
   handleApiError,
   requireAuth,
 } from "@/lib/api-utils";

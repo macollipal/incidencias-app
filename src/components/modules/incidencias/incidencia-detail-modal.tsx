@@ -72,12 +72,11 @@ export function IncidenciaDetailModal({
     });
 
     const { data: incidencia, isLoading: loadingIncidencia } = useIncidencia(id);
-    const { data: comentarios, isLoading: loadingComentarios } = useComentarios(id);
+    const { data: comentarios } = useComentarios(id);
     const addComentarioMutation = useAddComentario();
     const resolverMutation = useResolverConserje();
     const escalarMutation = useEscalarIncidencia();
 
-    const isResidente = userRole === "RESIDENTE";
     const isConserje = userRole === "CONSERJE";
     const canConserjeAct = isConserje &&
         incidencia?.estado === "ASIGNADA" &&

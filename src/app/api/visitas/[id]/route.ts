@@ -77,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       updateData.fechaProgramada = new Date(data.fechaProgramada);
     }
 
-    const updated = await prisma.visita.update({
+    await prisma.visita.update({
       where: { id },
       data: updateData,
     });

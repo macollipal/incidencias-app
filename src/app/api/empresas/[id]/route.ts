@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { tiposServicio, ...data } = updateEmpresaSchema.parse(body);
 
     // Actualizar empresa
-    const updated = await prisma.empresa.update({
+    await prisma.empresa.update({
       where: { id },
       data,
     });

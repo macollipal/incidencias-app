@@ -66,7 +66,7 @@ export default function IncidenciasPage() {
     try {
       await updateMutation.mutateAsync({ id, data: { prioridad: "URGENTE" } });
       toast.success("Incidencia marcada como urgente");
-    } catch (error) {
+    } catch {
       toast.error("Error al actualizar");
     }
   };
@@ -75,7 +75,7 @@ export default function IncidenciasPage() {
     try {
       await updateMutation.mutateAsync({ id, data: { estado: "CERRADA" } });
       toast.success("Incidencia cerrada");
-    } catch (error) {
+    } catch {
       toast.error("Error al cerrar");
     }
   };
@@ -163,7 +163,7 @@ export default function IncidenciasPage() {
       />
 
       <ProgramarVisitaModal
-        incidencia={incidencias?.find(i => i.id === selectedId)}
+        incidencia={incidencias?.find(i => i.id === selectedId) ?? null}
         open={visitaModalOpen}
         onOpenChange={setVisitaModalOpen}
         edificioId={selectedEdificioId}

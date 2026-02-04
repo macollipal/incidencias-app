@@ -21,8 +21,7 @@ import {
     Save,
     Eye,
     EyeOff,
-    Globe,
-    Settings as SettingsIcon
+    Globe
 } from "lucide-react";
 import { useAdminConfig, useUpdateConfig } from "@/hooks/use-config";
 

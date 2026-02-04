@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
     successResponse,
@@ -9,7 +8,7 @@ import {
 export const dynamic = "force-dynamic";
 
 // POST /api/notificaciones/marcar-todas-leidas - Marcar todas como leídas
-export async function POST(request: NextRequest) {
+export async function POST() {
     try {
         const session = await requireAuth();
 
